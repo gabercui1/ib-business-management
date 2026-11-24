@@ -439,6 +439,43 @@ dialog[open] { display: flex; flex-direction: column; }
   .chapter-nav a { font-size: 15px; }
 }
 @media (max-width: 365px) { .brand-name { display: none; } }
+.textbook-bar { display:flex; align-items:center; justify-content:space-between; gap:12px 20px; padding:13px 16px; margin:0 0 20px; border:1px solid var(--strong-line); background:#171717; border-radius:4px; }
+.textbook-bar > div { display:flex; gap:5px 9px; align-items:center; flex-wrap:wrap; }
+.textbook-bar strong { font-size:14px; }
+.textbook-bar span { color:#c4c4c4; font-size:13px; }
+.book-connect,.source-start { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:6px 10px; border:1px solid #747474; border-radius:3px; color:#f1f1ef; font:600 13px/1.55 var(--sans); }
+.book-connect { white-space:nowrap; background:#eaeae7; color:#151513; border-color:#eaeae7; }
+.book-connect:hover { background:white; }
+.source-start:hover { border-color:#f2f2f2; }
+.source-request { margin:10px 0 8px; }
+.source-request > div { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; }
+.source-request span,.source-head,.source-ref { font:12px/1.45 var(--sans); }
+.source-request span { color:#bebebe; }
+.public-excerpt { margin-block:10px 14px; max-width:62ch; font:19px/1.5 var(--serif); color:#f1f1ef; }
+.public-excerpt cite { font:12px/1.5 var(--sans); color:#c1c1c1; }
+.textbook-content { min-width:0; margin:12px 0; padding:clamp(12px,2vw,21px); background:#fafaf8; color:#171815; border:1px solid #dededb; border-radius:4px; }
+.source-head { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; margin-bottom:8px; }
+.source-head > span { font-weight:650; color:#333630; }
+.source-ref { color:#555751; text-decoration:underline; text-underline-offset:2px; padding:0 1px; text-align:left; }
+.source-ref:hover { color:#151614; }
+.book-excerpt { display:block; width:100%; min-width:0; max-width:100%; color:#444740; background:white; overflow-wrap:anywhere; font:13px/1.4 var(--sans); }
+.book-excerpt canvas { display:block; max-width:100%; }
+.source-list { margin-top:16px; padding-top:12px; border-top:1px solid #d9dad5; }
+.source-list h4 { margin:0 0 8px; font:650 15px/1.4 var(--sans); letter-spacing:-.012em; color:#1a1c19; }
+.source-list ul { list-style:disc outside; padding-inline-start:20px; margin:0; }
+.source-list li { display:list-item; min-width:0; padding:0 0 0 2px; margin:8px 0 12px; }
+.source-list li::marker { color:#3b3d36; }
+.source-list li .source-ref { display:inline-block; margin-top:2px; }
+.source-list li:last-child { margin-bottom:0; }
+.book-body .edition-status:empty { display:none; }
+.book-body .edition-status { margin:8px 0; color:#e4e4e0; }
+.references-grid .textbook-bar { margin:14px 0 4px; flex-wrap:wrap; }
+@media (max-width:680px) {
+  .textbook-bar { align-items:flex-start; flex-wrap:wrap; padding:12px; }
+  .textbook-bar span { flex-basis:100%; }
+  .textbook-content { padding:12px 10px; }
+  .source-list ul { padding-inline-start:16px; }
+}
 @media print {
   .home-example,.chapter-nav,.lesson-recall,.term-tools .save-note { display: none !important; }
   .lesson-text p,.lesson-text th,.lesson-text td,.lesson-text h2,.lesson-text h3,.lesson-text strong,.comparison caption,.lesson-text .ref-button,.section-explanation { color: #111 !important; }

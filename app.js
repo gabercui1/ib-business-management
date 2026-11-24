@@ -43,11 +43,14 @@
     .map(key => legacyKeys[key] || key).filter(key => byKey.has(key)));
   const topicIds = Object.keys(TOPICS);
   let browseLevel = "all";
-    let renderedLesson = "";
+  let renderedLesson = "";
   let deck = null;
   let bookUrl = "";
   let bookFileSize = 0;
   let bookTarget = null;
+  let sourceState = "empty";
+  let sourceRequest = 0;
+  let activeBookNote = null;
   let lastSearchOpener = null;
   const pageOffset = document.getElementById("page-offset");
   const bookPage = document.getElementById("book-page");
@@ -140,6 +143,12 @@
       <div class="unit-detail-list">${rows || `<div class="empty"><h3>These subtopics are shared.</h3><p>Students at both levels study all five Unit 1 subtopics in this guide.</p><button data-filter="core" type="button" class="light-button">Show SL &amp; HL content</button></div>`}</div></section>`;
   }
   function refFor(note) {
+    const source = BOOK_TERMS[note.title];
+    if (source) {
+      const ids = [...source.d, ...(source.lists || []).flatMap(([, items]) => items.flat())];
+      const pages = [...new Set(ids.map(i => BOOK_PASSAGES[i][0]))].sort((a, b) => a - b);
+      return { label: formatPages(pages), first: BOOK_PASSAGES[source.d[0]][0], pages, exact: true };
+    }
     if (note.page) {
       const p = String(note.page);
       return { label: `${/^\d+$/.test(p) ? "p." : "pp."} ${p}`, first: Number(p.match(/\d+/)?.[0]), exact: true };
@@ -176,23 +185,52 @@
     const ref = refFor(note);
     return `<button type="button" class="ref-button" data-book="${escape(note.key)}" aria-label="Read ${escape(note.title)} in your textbook, ${escape(ref.label)}">${icon("book",14)} Hoang, ${escape(ref.label)}</button>`;
   }
+  function formatPages(pages) {
+    const runs = [];
+    for (const p of pages) {
+      const last = runs[runs.length - 1];
+      if (last && last[1] + 1 === p) last[1] = p;
+      else runs.push([p,p]);
+    }
+    return (pages.length === 1 ? "p. " : "pp. ") + runs.map(([a,b]) => a === b ? a : `${a}–${b}`).join(", ");
+  }
+  function sourcePageLink(note, ids) {
+    const pages = [...new Set(ids.map(i => BOOK_PASSAGES[i][0]))].sort((a,b) => a-b);
+    return `<button class="source-ref" type="button" data-book="${escape(note.key)}" data-page="${BOOK_PASSAGES[ids[0]][0]}" aria-label="Open textbook reference for ${escape(note.title)}, ${formatPages(pages)}">${formatPages(pages)}</button>`;
+  }
+  function excerpt(note, ids, label) {
+    return `<div class="book-excerpt" data-excerpt="${ids.join(",")}" aria-label="${escape(note.title)} · ${escape(label)}">Reading textbook…</div>`;
+  }
+  function textbookFor(note) {
+    const entry = BOOK_TERMS[note.title];
+    const label = entry.kind || "Textbook definition";
+    const lists = entry.lists || [];
+    if (sourceState !== "ready") {
+      const sample = note.key === "4.1/market-orientation" ?
+        `<blockquote class="public-excerpt">“Market research and data analyses are therefore central to a market orientation approach.” <cite>Paul Hoang, p. 342</cite></blockquote>` : "";
+      const printed = refFor(note).label;
+      const count = lists.reduce((sum,[,items])=>sum+items.length,0);
+      const action = sourceState === "other" || sourceState === "error" ? "Open textbook pages" : "Read textbook wording";
+      return `<div class="source-request">${sample}<div><button class="source-start" type="button" data-book="${escape(note.key)}">${icon("book",15)} ${action}</button><span>${escape(printed)}${count ? ` · ${count} ${count === 1 ? "point" : "points"}` : ""}</span></div></div>`;
+    }
+    const definition = `<div class="source-definition"><div class="source-head"><span>${escape(label)}</span>${sourcePageLink(note,entry.d)}</div>${excerpt(note,entry.d,label)}</div>`;
+    const evaluations = lists.map(([heading,items]) => `<section class="source-list" aria-label="${escape(heading)}"><h4>${escape(heading)}</h4><ul>${items.map((ids,i)=>`<li>${excerpt(note,ids,heading+" "+(i+1))}${sourcePageLink(note,ids)}</li>`).join("")}</ul></section>`).join("");
+    return `<div class="textbook-content">${definition}${evaluations}</div>`;
+  }
+  function bookBanner(note) {
+    const connected = sourceState === "ready";
+    return `<div class="textbook-bar"><div>${icon("book",18)}<strong>${connected ? "Textbook connected" : "Textbook wording"}</strong><span>${connected ? "Paul Hoang · Fifth edition" : "Read definitions and bullet points from your class PDF."}</span></div><button type="button" class="book-connect" data-book="${escape(note.key)}">${connected ? "Book options" : "Connect textbook PDF"}</button></div>`;
+  }
+  function refreshExcerpts() {
+    if (sourceState === "ready") TextbookReader.refresh(main, key => key.split(",").map(i => BOOK_PASSAGES[Number(i)]), scanOffset);
+  }
   function termPassage(note) {
     return `<div class="reading-term" id="term-${note.id}">
       <div class="term-heading"><h3 tabindex="-1">${escape(note.title)}</h3>${note.level === "hl" ? badge("hl") : ""}</div>
-      <p>${escape(note.definition)}</p>
+      ${textbookFor(note)}
       ${note.formula ? `<p class="reading-formula">${escape(note.formula)}</p>` : ""}
-      <p class="reading-example"><strong>Example</strong> ${escape(note.application)}</p>
-      ${note.quote ? `<blockquote>“${escape(note.quote)}” <cite>Paul Hoang, ${escape(refFor(note).label)}</cite></blockquote>` : ""}
+      <p class="reading-example"><strong>Practice example</strong> ${escape(note.application)}</p>
       <div class="term-tools">${pageButton(note)}${saveButton(note)}</div></div>`;
-  }
-  function compareEntries(entries) {
-    if (entries.length === 1) {
-      const n=entries[0], labels=n.tradeoffLabels || ["Advantage","Disadvantage"];
-      return `<div class="single-evaluation"><p><strong>${escape(labels[0])}</strong> ${escape(n.advantage)}</p><p><strong>${escape(labels[1])}</strong> ${escape(n.disadvantage)}</p></div>`;
-    }
-    return `<table class="comparison"><caption>Advantages, limitations and conditions</caption>
-      <thead><tr><th scope="col">Term</th><th scope="col">Advantage or use</th><th scope="col">Limitation or condition</th></tr></thead>
-      <tbody>${entries.map(n=>`<tr><th scope="row">${escape(n.title)}</th><td data-label="Advantage or use">${escape(n.advantage)}</td><td data-label="Limitation or condition">${escape(n.disadvantage)}</td></tr>`).join("")}</tbody></table>`;
   }
   const mixBreaks = {
     Product: {"Product": "The offer", "Product life cycle": "The product life cycle", "Product portfolio": "Managing a portfolio", "Extension strategies": "Extending a product and building a brand"},
@@ -202,7 +240,7 @@
   };
   function sectionPassages(id, group, entries) {
     const breaks = id === "4.5" && mixBreaks[group];
-    if (!breaks) return entries.map(termPassage).join("") + compareEntries(entries);
+    if (!breaks) return entries.map(termPassage).join("");
     const chunks = [];
     let heading = "";
     for (const entry of byTopic[id].filter(n=>n.group === group)) {
@@ -211,7 +249,7 @@
       if (chunks.at(-1)?.title !== heading) chunks.push({title:heading, notes:[]});
       chunks.at(-1).notes.push(entry);
     }
-    return chunks.map(c=>`<div class="reading-part"><h3 class="part-title">${escape(c.title)}</h3>${c.notes.map(termPassage).join("")}${compareEntries(c.notes)}</div>`).join("");
+    return chunks.map(c=>`<div class="reading-part"><h3 class="part-title">${escape(c.title)}</h3>${c.notes.map(termPassage).join("")}</div>`).join("");
   }
   function caseExample(c, label) {
     return `<div class="case-example">${label ? `<p class="field-title">${escape(label)}</p>` : ""}
@@ -246,6 +284,7 @@
       <header class="page-intro topic-intro"><p class="kicker"><span class="kicker-line"></span> Lesson ${id}</p>
       <h1>${escape(meta.name)}</h1><p class="deck">${escape(guide.opening)}</p></header>
       <div class="levels-row">${levelBar}<span class="lesson-edition">Hoang, 5th edition · pp. ${escape(meta.pages)}</span></div>
+      ${bookBanner(all[0])}
       <div class="study-layout">${lessonContents(id,level,groups)}<article class="lesson-text">
       ${sections}${practice(id,level)}
       <a class="lesson-recall" href="#/flashcards/${id}/${level}">Practise this lesson with flashcards ${icon("arrow",17)}</a>
@@ -261,7 +300,7 @@
   }
   function references() {
     return `${crumbs([{ name: "Textbook & syllabus" }])}<section class="page-intro"><p class="kicker"><span class="kicker-line"></span> Reading references</p><h1>Textbook &amp; syllabus<span class="title-dot">.</span></h1><p class="deck">Find the wording in your own edition and check which topics belong to your level.</p></section>
-      <div class="references-grid"><section><span class="unit-label">${icon("book")} Textbook</span><h2>Business Management</h2><p>Paul Hoang · 5th edition · IBID Press, 2022</p><p>Each term links to a printed page or range. Some topics also point to the toolkit chapters. Select your own PDF once per visit to open the cited pages.</p><p>Lessons use the fifth edition’s terminology. Explanations and cases are written for this guide. A labelled quotation gives the textbook’s exact wording.</p><div class="ref-links"><a href="${REFERENCES.publisher}" target="_blank" rel="noopener">Publisher’s edition ↗</a><a href="${REFERENCES.contents}" target="_blank" rel="noopener">Contents by chapter ↗</a></div></section>
+      <div class="references-grid"><section><span class="unit-label">${icon("book")} Textbook</span><h2>Business Management</h2><p>Paul Hoang · 5th edition · IBID Press, 2022</p><p>Connect the class PDF once per visit. Each definition and each listed point displays the relevant lines from your copy, including the book’s explanation where it gives one. The page number beside each passage opens its source.</p><p>Practice examples and Paper 2 cases are written for this guide.</p>${bookBanner(firstByTitle("Market orientation"))}<div class="ref-links"><a href="${REFERENCES.publisher}" target="_blank" rel="noopener">Publisher’s edition ↗</a><a href="${REFERENCES.contents}" target="_blank" rel="noopener">Contents by chapter ↗</a></div></section>
       <section><span class="unit-label">${icon("layers")} Syllabus</span><h2>IB Diploma Programme</h2><p>Business management · First assessment 2024</p><p>This guide covers 1.1–1.5 and 4.1–4.6. The shared core applies to both levels. HL students also study the concepts marked HL only.</p><p>Read a full lesson from the unit index, or use Flashcards to practise recall by subtopic.</p><div class="ref-links"><a href="${REFERENCES.sl}" target="_blank" rel="noopener">SL subject brief ↗</a><a href="${REFERENCES.hl}" target="_blank" rel="noopener">HL subject brief ↗</a></div></section></div>`;
   }
   function deckSettings(parts) {
@@ -276,10 +315,8 @@
       return `<div class="empty"><h2>No matching flashcards</h2><p>${escape(message)}</p><a class="light-button" href="#/flashcards">All flashcards ${icon("arrow",15)}</a></div>`;
     }
     const n=deck.items[deck.index], number=deck.index+1, total=deck.items.length;
-    const labels=n.tradeoffLabels || ["Advantage","Disadvantage"];
-    const answer=deck.revealed ? `<div class="flash-answer"><p class="flash-definition">${escape(n.definition)}</p>
-      ${n.formula ? `<p class="reading-formula">${escape(n.formula)}</p>`:""}<p><strong>Example</strong> ${escape(n.application)}</p>
-      <p><strong>${escape(labels[0])}</strong> ${escape(n.advantage)}</p><p><strong>${escape(labels[1])}</strong> ${escape(n.disadvantage)}</p></div>` : `<p class="recall-prompt">Explain the term and give a business example.</p>`;
+    const answer=deck.revealed ? `<div class="flash-answer">${textbookFor(n)}
+      ${n.formula ? `<p class="reading-formula">${escape(n.formula)}</p>`:""}<p><strong>Practice example</strong> ${escape(n.application)}</p></div>` : `<p class="recall-prompt">Explain the term and give a business example.</p>`;
     return `<section class="flashcard"><div class="flash-card-top"><span class="kicker">${n.topic} · ${escape(n.group)}</span>${badge(n.level)}</div>
       <h2 tabindex="-1" id="flash-title">${escape(n.title)}</h2>${answer}
       <div class="flash-actions"><button type="button" class="light-button" data-flash="flip" aria-expanded="${deck.revealed}">${deck.revealed?"Hide answer":"Show answer"}</button>
@@ -296,6 +333,7 @@
     const option=(value,label,selected)=>`<option value="${escape(value)}" ${value===selected?"selected":""}>${escape(label)}</option>`;
     const topics=UNITS[unit]?.topics || topicIds;
     return `${crumbs([{name:"Flashcards"}])}<header class="page-intro"><p class="kicker"><span class="kicker-line"></span> Active recall</p><h1>Flashcards<span class="title-dot">.</span></h1><p class="deck">Choose a unit or subtopic and test yourself before revealing the answer.</p></header>
+      ${bookBanner(deck.items[deck.index] || notes[0])}
       <div class="flash-layout"><aside class="deck-controls" aria-label="Choose a flashcard deck">
       <label for="flash-unit">Unit or collection</label><select id="flash-unit">${option("all","All units",unit)}${Object.entries(UNITS).map(([id,u])=>option(id,`Unit ${id} · ${u.name}`,unit)).join("")}${option("saved",`Saved terms (${saved.size})`,unit)}</select>
       ${unit!=="saved"?`<label for="flash-topic">Subtopic</label><select id="flash-topic">${option("all","All subtopics",TOPICS[settings.scope]?settings.scope:"all")}${topics.map(id=>option(id,`${id} · ${TOPICS[id].name}`,settings.scope)).join("")}</select>`:""}
@@ -318,6 +356,7 @@
     }
     const working=document.getElementById("flash-working");
     working.innerHTML=flashCard();
+    refreshExcerpts();
     (action==="flip" ? working.querySelector('[data-flash="flip"]') : document.getElementById("flash-title"))?.focus({preventScroll:true});
     document.getElementById("status").textContent=action==="flip" ? (deck.revealed?"Answer shown.":"Answer hidden.") : `Card ${deck.index+1} of ${deck.items.length}.`;
   }
@@ -373,7 +412,10 @@
         output=home(); name="IB Business Management";
       }
     }
-    if (output!==undefined) main.innerHTML=output;
+    if (output!==undefined) {
+      main.innerHTML=output;
+      refreshExcerpts();
+    }
     document.title=`${name} | Revision Desk`;
     for (const [id,active] of [["nav-index",!parts.length || inLesson || parts[0]==="unit"],["nav-flashcards",parts[0]==="flashcards" || parts[0]==="saved"]]) {
       const link=document.getElementById(id);
@@ -402,7 +444,9 @@
     let found;
     if (search) {
       found = notes.map(n => {
-        const name = cleanSearch(n.title), tags = cleanSearch(`${n.topic} ${TOPICS[n.topic].name} ${n.group} ${n.title}`), text = cleanSearch(n.definition);
+        const name = cleanSearch(n.title), tags = cleanSearch(`${n.topic} ${TOPICS[n.topic].name} ${n.group} ${n.title}`);
+        const headings = (BOOK_TERMS[n.title].lists || []).map(([heading]) => heading).join(" ");
+        const text = cleanSearch(`${n.application} ${n.formula || ""} ${headings}`);
         const hits = words.every(w => tags.includes(w) || text.includes(w));
         const rank = name === search ? 0 : name.startsWith(search) ? 1 : name.includes(search) ? 2 : words.every(w => tags.includes(w)) ? 3 : 4;
         return { n, rank, hits };
@@ -436,10 +480,10 @@
 
   function scanOffset(printedPage) {
     // The class scan repeats some printed pages. Its offsets were checked against the page footers.
-    if (bookFileSize !== 862189331) return 0;
+    if (bookFileSize !== 862189331 && sourceState !== "ready") return 0;
     if (printedPage>=11 && printedPage<=88) return -1;
     if (printedPage>=370 && printedPage<=477) return 1;
-    if (printedPage>=607 && printedPage<=721) return 2;
+    if (printedPage>=607 && printedPage<=725) return 2;
     return 0;
   }
   function updateBookLink() {
@@ -455,28 +499,60 @@
     link.textContent=`Open printed p. ${printedPage} ↗`;
     document.getElementById("book-status").textContent=`Printed p. ${printedPage} opens at PDF viewer page ${viewerPage}.`;
   }
-  function openBook(note) {
+  function openBook(note, requestedPage, returnToTerm = false) {
+    activeBookNote = returnToTerm ? note : null;
     bookTarget=refFor(note);
     document.getElementById("book-reference").textContent=`${note.title} · ${bookTarget.label}`;
-    const ranges=String(note.page || bookTarget.first).split(",").map(s=>s.trim());
-    bookPage.innerHTML=ranges.map(range=>`<option value="${Number.parseInt(range,10)}">${escape(range)}</option>`).join("");
-    document.getElementById("book-parts").hidden=ranges.length<2;
+    const pages=bookTarget.pages || [bookTarget.first];
+    const selected=pages.includes(requestedPage) ? requestedPage : bookTarget.first;
+    bookPage.innerHTML=pages.map(p=>`<option value="${p}" ${p===selected?"selected":""}>p. ${p}</option>`).join("");
+    bookPage.value=String(selected);
+    document.getElementById("book-parts").hidden=pages.length<2;
+    document.getElementById("book-title").textContent=sourceState==="ready" ? "Read in your textbook" : "Connect your textbook";
     updateBookLink();
     bookDialog.showModal();
   }
-  document.getElementById("book-file").addEventListener("change", e=>{
+  document.getElementById("book-file").addEventListener("change", async e=>{
     const file=e.target.files[0];
     if (!file) return;
+    const request=++sourceRequest;
+    const editionStatus=document.getElementById("edition-status");
     if (bookUrl) URL.revokeObjectURL(bookUrl);
     bookUrl="";
     bookFileSize=0;
-    if (file.type==="application/pdf" || !file.type && /\.pdf$/i.test(file.name)) {
-      bookUrl=URL.createObjectURL(file);
-      bookFileSize=file.size;
-      const previous=readLocal("bm-revision-offset-v2-"+bookFileSize,null);
-      pageOffset.value=previous===null ? "" : previous;
-    } else document.getElementById("book-status").textContent="Choose a PDF file to open the reference.";
+    sourceState="empty";
+    TextbookReader.clear();
+    document.getElementById("book-status").textContent="";
+    if (!(file.type==="application/pdf" || !file.type && /\.pdf$/i.test(file.name))) {
+      editionStatus.textContent="Choose a PDF copy of Paul Hoang’s fifth edition.";
+      updateBookLink();
+      render({refresh:true,keepPosition:true});
+      return;
+    }
+    bookUrl=URL.createObjectURL(file);
+    bookFileSize=file.size;
+    const previous=readLocal("bm-revision-offset-v2-"+bookFileSize,null);
+    pageOffset.value=previous===null ? "" : previous;
     updateBookLink();
+    editionStatus.textContent="Checking the textbook edition…";
+    try {
+      const result=await TextbookReader.attach(file);
+      if (request!==sourceRequest) return;
+      sourceState=result.matched ? "ready" : "other";
+      editionStatus.textContent=result.matched ? "Connected. Textbook passages are available in every lesson and flashcard." : "This PDF has a different layout. Use the printed-page link below to read it, or choose the class copy for inline passages.";
+    } catch {
+      if (request!==sourceRequest) return;
+      sourceState="error";
+      editionStatus.textContent="The inline reader could not open this PDF. You can still open a printed page below or choose the file again.";
+    }
+    e.target.value="";
+    updateBookLink();
+    render({refresh:true,keepPosition:true});
+    if (sourceState==="ready" && bookDialog.open) {
+      bookDialog.close();
+      if (activeBookNote && route()[0]==="topic") scrollToLesson("term-"+activeBookNote.id);
+    }
+    document.getElementById("status").textContent=editionStatus.textContent;
   });
   pageOffset.addEventListener("input", ()=>{
     if (bookUrl) writeLocal("bm-revision-offset-v2-"+bookFileSize,pageOffset.value===""?null:Number(pageOffset.value));
@@ -528,7 +604,7 @@
         holder.querySelector("[data-save]")?.focus({ preventScroll: true });
       }
     } else if (el.dataset.book) {
-      openBook(byKey.get(el.dataset.book));
+      openBook(byKey.get(el.dataset.book), Number(el.dataset.page), !!el.closest(".reading-term"));
     } else if (el.dataset.close) {
       document.getElementById(el.dataset.close).close();
     } else if (el.id === "draw-sample") {
