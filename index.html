@@ -7,13 +7,11 @@
   <meta name="description" content="Read IB Business Management lessons for Units 1 and 4 by subtopic. Study worked examples and compare business decisions, then use separate SL and HL flashcards to practise recall.">
   <title>Business Management | Revision Desk</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=book2">
+  <link rel="stylesheet" href="style.css?v=text1">
   <script src="course.js" defer></script>
   <script src="notes.js" defer></script>
-  <script src="lessons.js" defer></script>
-  <script src="book-index.js" defer></script>
-  <script src="textbook-reader.js" defer></script>
-  <script src="app.js?v=book2" defer></script>
+  <script src="textbook.js?v=text1" defer></script>
+  <script src="app.js?v=text1" defer></script>
 </head>
 <body>
   <a class="skip" href="#main-content">Skip to content</a>
@@ -36,19 +34,6 @@
     <div class="search-head"><h2 id="search-title">Search the lessons</h2><button id="close-search" class="square" type="button" aria-label="Close search">×</button></div>
     <div class="search-field"><span class="magnifier" aria-hidden="true"></span><input id="search-input" type="search" autocomplete="off" placeholder="Search topics or concepts…" aria-label="Search topics or concepts"></div>
     <p id="search-status" role="status"></p><div id="search-results"></div>
-  </dialog>
-  <dialog id="book-dialog" aria-labelledby="book-title">
-    <div class="search-head"><h2 id="book-title">Connect your textbook</h2><button class="square" type="button" data-close="book-dialog" aria-label="Close textbook reference">×</button></div>
-    <div class="book-body">
-      <p class="kicker">Paul Hoang · Fifth edition</p><p id="book-reference" class="book-reference"></p>
-      <p>Choose the class copy of the fifth edition to read the original wording inside lessons and flashcards. Your PDF stays on this device.</p>
-      <label class="field-label" for="book-file">Textbook PDF</label><input id="book-file" type="file" accept="application/pdf,.pdf">
-      <p id="edition-status" class="edition-status" role="status"></p>
-      <div id="book-parts" hidden><label class="field-label" for="book-page">Printed reference</label><select id="book-page"></select></div>
-      <details class="offset"><summary>Adjust PDF page numbering</summary><label for="page-offset">Viewer page minus printed page</label><input id="page-offset" type="number" min="-50" max="200" step="1" placeholder="0"><small>Leave blank for automatic numbering. If printed page 11 is viewer page 15 in another copy, enter 4.</small></details>
-      <p id="book-status" role="status"></p><a id="book-open" class="light-button" target="_blank" rel="noopener" hidden>Open textbook page ↗</a>
-      <a href="#/references" id="book-sources" class="source-link">Textbook and syllabus details <span aria-hidden="true">→</span></a>
-    </div>
   </dialog>
   <span class="visually-hidden" id="status" role="status"></span>
 </body>

@@ -4,7 +4,6 @@
   const main = document.getElementById("main-content");
   const searchDialog = document.getElementById("search-dialog");
   const searchInput = document.getElementById("search-input");
-  const bookDialog = document.getElementById("book-dialog");
   const escape = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
   const slug = value => value.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const icons = {
@@ -45,15 +44,7 @@
   let browseLevel = "all";
   let renderedLesson = "";
   let deck = null;
-  let bookUrl = "";
-  let bookFileSize = 0;
-  let bookTarget = null;
-  let sourceState = "empty";
-  let sourceRequest = 0;
-  let activeBookNote = null;
   let lastSearchOpener = null;
-  const pageOffset = document.getElementById("page-offset");
-  const bookPage = document.getElementById("book-page");
 
   function badge(level) {
     return `<span class="level-badge ${level === "hl" ? "hl" : ""}">${escape(levelNames[level])}</span>`;
@@ -126,7 +117,7 @@
     return `<section class="hero home-hero"><div class="hero-copy">
       <p class="kicker"><span class="kicker-line"></span> IB Diploma Programme · SL and HL</p>
       <h1>Business<br>Management<span class="title-dot">.</span></h1>
-      <p class="deck">Study by unit and subtopic. Read each lesson from start to finish, with worked examples and textbook references along the way.</p></div>
+      <p class="deck">Choose a unit and subtopic to read the textbook definitions, advantages and disadvantages. Use the flashcards to practise recall.</p></div>
       <aside class="home-example"><p class="kicker">From lesson 4.1 · Market share</p>
       <h2>Sales grew. Why did market share fall?</h2>
       <table><thead><tr><th></th><th>Year 1</th><th>Year 2</th></tr></thead><tbody>
@@ -141,22 +132,6 @@
     return `${crumbs([{name: `Unit ${id}`}])}<section class="page-intro"><p class="kicker"><span class="kicker-line"></span> Unit ${id}</p><h1>${escape(u.name)}</h1><p class="deck">${escape(u.description)}</p></section>
       <section class="unit-section"><div class="section-line"><div class="section-title"><h2>Subtopics</h2></div>${filterControls()}</div>
       <div class="unit-detail-list">${rows || `<div class="empty"><h3>These subtopics are shared.</h3><p>Students at both levels study all five Unit 1 subtopics in this guide.</p><button data-filter="core" type="button" class="light-button">Show SL &amp; HL content</button></div>`}</div></section>`;
-  }
-  function refFor(note) {
-    const source = BOOK_TERMS[note.title];
-    if (source) {
-      const ids = [...source.d, ...(source.lists || []).flatMap(([, items]) => items.flat())];
-      const pages = [...new Set(ids.map(i => BOOK_PASSAGES[i][0]))].sort((a, b) => a - b);
-      return { label: formatPages(pages), first: BOOK_PASSAGES[source.d[0]][0], pages, exact: true };
-    }
-    if (note.page) {
-      const p = String(note.page);
-      return { label: `${/^\d+$/.test(p) ? "p." : "pp."} ${p}`, first: Number(p.match(/\d+/)?.[0]), exact: true };
-    }
-    const meta = TOPICS[note.topic];
-    const part = note.topic === "4.5" && MIX_CHAPTERS[note.group];
-    const range = part ? part[1] : meta.pages;
-    return { label: `chapter pp. ${range}`, first: Number(range.split("–")[0]), exact: false };
   }
   function groupNotes(list) {
     const result = new Map();
@@ -181,56 +156,57 @@
     const isSaved = saved.has(note.key);
     return `<button class="save-note${isSaved ? " is-saved" : ""}" type="button" data-save="${escape(note.key)}" aria-pressed="${isSaved}" aria-label="${isSaved ? "Remove saved concept" : "Save concept"}">${icon(isSaved ? "check" : "bookmark", 15)}<span>${isSaved ? "Saved" : "Save"}</span></button>`;
   }
-  function pageButton(note) {
-    const ref = refFor(note);
-    return `<button type="button" class="ref-button" data-book="${escape(note.key)}" aria-label="Read ${escape(note.title)} in your textbook, ${escape(ref.label)}">${icon("book",14)} Hoang, ${escape(ref.label)}</button>`;
-  }
   function formatPages(pages) {
     const runs = [];
-    for (const p of pages) {
+    for (const page of [...new Set(pages)].sort((a,b) => a-b)) {
       const last = runs[runs.length - 1];
-      if (last && last[1] + 1 === p) last[1] = p;
-      else runs.push([p,p]);
+      if (last && last[1] + 1 === page) last[1] = page;
+      else runs.push([page, page]);
     }
-    return (pages.length === 1 ? "p. " : "pp. ") + runs.map(([a,b]) => a === b ? a : `${a}–${b}`).join(", ");
+    const label = runs.length === 1 && runs[0][0] === runs[0][1] ? "p." : "pp.";
+    return label + " " + runs.map(([a,b]) => a === b ? a : `${a}–${b}`).join(", ");
   }
-  function sourcePageLink(note, ids) {
-    const pages = [...new Set(ids.map(i => BOOK_PASSAGES[i][0]))].sort((a,b) => a-b);
-    return `<button class="source-ref" type="button" data-book="${escape(note.key)}" data-page="${BOOK_PASSAGES[ids[0]][0]}" aria-label="Open textbook reference for ${escape(note.title)}, ${formatPages(pages)}">${formatPages(pages)}</button>`;
+
+  function textbookTable(table) {
+    const headings = table.headers.map(text => `<th scope="col">${escape(text)}</th>`).join("");
+    const rows = table.rows.map(cells => `<tr><th scope="row">${escape(cells[0])}</th>${cells.slice(1).map(text => `<td>${escape(text)}</td>`).join("")}</tr>`).join("");
+    return `<div class="book-table-wrap"><table class="book-table">${table.caption ? `<caption>${escape(table.caption)}</caption>` : ""}<thead><tr>${headings}</tr></thead><tbody>${rows}</tbody></table></div>`;
   }
-  function excerpt(note, ids, label) {
-    return `<div class="book-excerpt" data-excerpt="${ids.join(",")}" aria-label="${escape(note.title)} · ${escape(label)}">Reading textbook…</div>`;
-  }
+
   function textbookFor(note) {
-    const entry = BOOK_TERMS[note.title];
-    const label = entry.kind || "Textbook definition";
-    const lists = entry.lists || [];
-    if (sourceState !== "ready") {
-      const sample = note.key === "4.1/market-orientation" ?
-        `<blockquote class="public-excerpt">“Market research and data analyses are therefore central to a market orientation approach.” <cite>Paul Hoang, p. 342</cite></blockquote>` : "";
-      const printed = refFor(note).label;
-      const count = lists.reduce((sum,[,items])=>sum+items.length,0);
-      const action = sourceState === "other" || sourceState === "error" ? "Open textbook pages" : "Read textbook wording";
-      return `<div class="source-request">${sample}<div><button class="source-start" type="button" data-book="${escape(note.key)}">${icon("book",15)} ${action}</button><span>${escape(printed)}${count ? ` · ${count} ${count === 1 ? "point" : "points"}` : ""}</span></div></div>`;
+    const entry = TEXTBOOK[note.title];
+    const pages = entry.d.flatMap(part => part.pages);
+    const definition = entry.d.map(part => part.table ? textbookTable(part.table) : `<p>${escape(part.text)}</p>`).join("");
+    const lists = (entry.lists || []).map(({heading, items}) => {
+      const allPages = [...new Set(items.flatMap(item => item.pages))];
+      const bullets = items.map(item => {
+        const start = item.point ? `<strong class="point-title">${escape(item.point)}</strong><br>` : "";
+        const ref = allPages.length > 1 ? ` <span class="book-page">${formatPages(item.pages)}</span>` : "";
+        return `<li>${start}<span class="point-body">${escape(item.text)}</span>${ref}</li>`;
+      }).join("");
+      return `<section class="source-list" aria-label="${escape(heading)}"><div class="source-heading"><h4>${escape(heading)}</h4><span class="book-page">${formatPages(allPages)}</span></div><ul>${bullets}</ul></section>`;
+    }).join("");
+    return `<div class="textbook-content"><div class="source-heading"><span class="definition-label">${escape(entry.kind || "Definition")}</span><cite class="book-page">Hoang, ${formatPages(pages)}</cite></div><div class="source-definition">${definition}</div>${lists}</div>`;
+  }
+
+  function sourceSearchText(note) {
+    const entry = TEXTBOOK[note.title];
+    const parts = entry.d.map(part => part.text || [part.table.caption, ...part.table.headers, ...part.table.rows.flat()].join(" "));
+    for (const group of entry.lists || []) {
+      parts.push(group.heading);
+      for (const item of group.items) parts.push(item.point || "", item.text);
     }
-    const definition = `<div class="source-definition"><div class="source-head"><span>${escape(label)}</span>${sourcePageLink(note,entry.d)}</div>${excerpt(note,entry.d,label)}</div>`;
-    const evaluations = lists.map(([heading,items]) => `<section class="source-list" aria-label="${escape(heading)}"><h4>${escape(heading)}</h4><ul role="list">${items.map((ids,i)=>`<li>${excerpt(note,ids,heading+" "+(i+1))}${sourcePageLink(note,ids)}</li>`).join("")}</ul></section>`).join("");
-    return `<div class="textbook-content">${definition}${evaluations}</div>`;
+    return parts.join(" ");
   }
-  function bookBanner(note) {
-    const connected = sourceState === "ready";
-    return `<div class="textbook-bar"><div>${icon("book",18)}<strong>${connected ? "Textbook connected" : "Textbook wording"}</strong><span>${connected ? "Paul Hoang · Fifth edition" : "Read definitions and bullet points from your class PDF."}</span></div><button type="button" class="book-connect" data-book="${escape(note.key)}">${connected ? "Book options" : "Connect textbook PDF"}</button></div>`;
-  }
-  function refreshExcerpts() {
-    if (sourceState === "ready") TextbookReader.refresh(main, key => key.split(",").map(i => BOOK_PASSAGES[Number(i)]), scanOffset);
-  }
+
+
   function termPassage(note) {
     return `<div class="reading-term" id="term-${note.id}">
       <div class="term-heading"><h3 tabindex="-1">${escape(note.title)}</h3>${note.level === "hl" ? badge("hl") : ""}</div>
       ${textbookFor(note)}
       ${note.formula ? `<p class="reading-formula">${escape(note.formula)}</p>` : ""}
-      <p class="reading-example"><strong>Practice example</strong> ${escape(note.application)}</p>
-      <div class="term-tools">${pageButton(note)}${saveButton(note)}</div></div>`;
+      <details class="practice-inline"><summary>Practice example</summary><p>${escape(note.application)}</p></details>
+      <div class="term-tools">${saveButton(note)}</div></div>`;
   }
   const mixBreaks = {
     Product: {"Product": "The offer", "Product life cycle": "The product life cycle", "Product portfolio": "Managing a portfolio", "Extension strategies": "Extending a product and building a brand"},
@@ -269,22 +245,20 @@
     return `<nav class="chapter-nav" aria-label="Continue studying"><div>${link(ids[i-1],"← Previous lesson")}</div><div>${link(ids[i+1],"Next lesson →")}</div></nav>`;
   }
   function topicView(id, level) {
-    const meta=TOPICS[id], guide=LESSONS[id], all=byTopic[id];
+    const meta=TOPICS[id], all=byTopic[id];
     const groups=groupNotes(all.filter(n=>level==="all" || n.level===level));
     const mixed=all.some(n=>n.level==="core") && all.some(n=>n.level==="hl");
     const levels=mixed ? [["all","Full lesson"],["core","SL & HL core"],["hl","HL only"]] : [];
     const levelBar=levels.length ? `<nav class="level-tabs" aria-label="Lesson coverage">${levels.map(([key,title])=>`<a class="level-tab" href="#/topic/${id}/${key}" ${level===key?'aria-current="true"':""}>${title}</a>`).join("")}</nav>` : badge(all[0].level);
     const sections=[...groups].map(([group,entries])=>{
-      const [title,intro]=guide.sections[group];
-      return `<section class="teaching-section" id="section-${slug(group)}"><h2 tabindex="-1">${escape(title)}</h2><p class="section-explanation">${escape(intro)}</p>
+      return `<section class="teaching-section" id="section-${slug(group)}"><h2 tabindex="-1">${escape(group)}</h2>
         ${id==="4.4" && group==="Sampling methods" ? spotlight() : ""}
         ${sectionPassages(id,group,entries)}</section>`;
     }).join("");
     return `${crumbs([{name:`Unit ${id[0]}`,href:`#/unit/${id[0]}`},{name:`Lesson ${id}`}])}
       <header class="page-intro topic-intro"><p class="kicker"><span class="kicker-line"></span> Lesson ${id}</p>
-      <h1>${escape(meta.name)}</h1><p class="deck">${escape(guide.opening)}</p></header>
+      <h1>${escape(meta.name)}</h1></header>
       <div class="levels-row">${levelBar}<span class="lesson-edition">Hoang, 5th edition · pp. ${escape(meta.pages)}</span></div>
-      ${bookBanner(all[0])}
       <div class="study-layout">${lessonContents(id,level,groups)}<article class="lesson-text">
       ${sections}${practice(id,level)}
       <a class="lesson-recall" href="#/flashcards/${id}/${level}">Practise this lesson with flashcards ${icon("arrow",17)}</a>
@@ -299,8 +273,8 @@
       <section class="saved-list">${kept.length ? '<a class="light-button saved-review" href="#/flashcards/saved">Practise saved flashcards →</a>' : ""}${kept.length ? `${kept.map(n => `<div class="saved-row">${resultRow(n)}${saveButton(n)}</div>`).join("")}` : `<div class="empty">${icon("bookmark", 28)}<h2>Your list is empty.</h2><p>Use Save beside a term in a lesson or on a flashcard to keep it here.</p><a href="#/" class="light-button">Browse the course ${icon("arrow", 15)}</a></div>`}</section>`;
   }
   function references() {
-    return `${crumbs([{ name: "Textbook & syllabus" }])}<section class="page-intro"><p class="kicker"><span class="kicker-line"></span> Reading references</p><h1>Textbook &amp; syllabus<span class="title-dot">.</span></h1><p class="deck">Find the wording in your own edition and check which topics belong to your level.</p></section>
-      <div class="references-grid"><section><span class="unit-label">${icon("book")} Textbook</span><h2>Business Management</h2><p>Paul Hoang · 5th edition · IBID Press, 2022</p><p>Connect the class PDF once per visit. Each definition and each listed point displays the relevant lines from your copy, including the book’s explanation where it gives one. The page number beside each passage opens its source.</p><p>Practice examples and Paper 2 cases are written for this guide.</p>${bookBanner(firstByTitle("Market orientation"))}<div class="ref-links"><a href="${REFERENCES.publisher}" target="_blank" rel="noopener">Publisher’s edition ↗</a><a href="${REFERENCES.contents}" target="_blank" rel="noopener">Contents by chapter ↗</a></div></section>
+    return `${crumbs([{ name: "Textbook & syllabus" }])}<section class="page-intro"><p class="kicker"><span class="kicker-line"></span> Reading references</p><h1>Textbook &amp; syllabus<span class="title-dot">.</span></h1><p class="deck">Sources for the lessons, flashcards and syllabus levels.</p></section>
+      <div class="references-grid"><section><span class="unit-label">${icon("book")} Textbook</span><h2>Business Management</h2><p>Paul Hoang · 5th edition · IBID Press, 2022</p><p>Definitions and evaluation points follow the fifth edition. Printed page numbers appear beside each passage or list. Practice examples and Paper 2 cases are written for this guide.</p><div class="ref-links"><a href="${REFERENCES.publisher}" target="_blank" rel="noopener">Publisher’s edition ↗</a><a href="${REFERENCES.contents}" target="_blank" rel="noopener">Contents by chapter ↗</a></div></section>
       <section><span class="unit-label">${icon("layers")} Syllabus</span><h2>IB Diploma Programme</h2><p>Business management · First assessment 2024</p><p>This guide covers 1.1–1.5 and 4.1–4.6. The shared core applies to both levels. HL students also study the concepts marked HL only.</p><p>Read a full lesson from the unit index, or use Flashcards to practise recall by subtopic.</p><div class="ref-links"><a href="${REFERENCES.sl}" target="_blank" rel="noopener">SL subject brief ↗</a><a href="${REFERENCES.hl}" target="_blank" rel="noopener">HL subject brief ↗</a></div></section></div>`;
   }
   function deckSettings(parts) {
@@ -333,7 +307,6 @@
     const option=(value,label,selected)=>`<option value="${escape(value)}" ${value===selected?"selected":""}>${escape(label)}</option>`;
     const topics=UNITS[unit]?.topics || topicIds;
     return `${crumbs([{name:"Flashcards"}])}<header class="page-intro"><p class="kicker"><span class="kicker-line"></span> Active recall</p><h1>Flashcards<span class="title-dot">.</span></h1><p class="deck">Choose a unit or subtopic and test yourself before revealing the answer.</p></header>
-      ${bookBanner(deck.items[deck.index] || notes[0])}
       <div class="flash-layout"><aside class="deck-controls" aria-label="Choose a flashcard deck">
       <label for="flash-unit">Unit or collection</label><select id="flash-unit">${option("all","All units",unit)}${Object.entries(UNITS).map(([id,u])=>option(id,`Unit ${id} · ${u.name}`,unit)).join("")}${option("saved",`Saved terms (${saved.size})`,unit)}</select>
       ${unit!=="saved"?`<label for="flash-topic">Subtopic</label><select id="flash-topic">${option("all","All subtopics",TOPICS[settings.scope]?settings.scope:"all")}${topics.map(id=>option(id,`${id} · ${TOPICS[id].name}`,settings.scope)).join("")}</select>`:""}
@@ -356,7 +329,6 @@
     }
     const working=document.getElementById("flash-working");
     working.innerHTML=flashCard();
-    refreshExcerpts();
     (action==="flip" ? working.querySelector('[data-flash="flip"]') : document.getElementById("flash-title"))?.focus({preventScroll:true});
     document.getElementById("status").textContent=action==="flip" ? (deck.revealed?"Answer shown.":"Answer hidden.") : `Card ${deck.index+1} of ${deck.items.length}.`;
   }
@@ -412,10 +384,7 @@
         output=home(); name="IB Business Management";
       }
     }
-    if (output!==undefined) {
-      main.innerHTML=output;
-      refreshExcerpts();
-    }
+    if (output!==undefined) main.innerHTML=output;
     document.title=`${name} | Revision Desk`;
     for (const [id,active] of [["nav-index",!parts.length || inLesson || parts[0]==="unit"],["nav-flashcards",parts[0]==="flashcards" || parts[0]==="saved"]]) {
       const link=document.getElementById(id);
@@ -434,19 +403,20 @@
   function cleanSearch(text) {
     return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9. ]/g, " ").replace(/\s+/g, " ").trim();
   }
+  const searchableText = new Map(notes.map(note => [note.key, cleanSearch(`${sourceSearchText(note)} ${note.application} ${note.formula || ""}`)]));
+
   function searchResults() {
     const search = cleanSearch(searchInput.value);
     const words = search.split(" ").filter(Boolean);
-    const sectionsFound = search ? topicIds.flatMap(id => Object.entries(LESSONS[id].sections)
-      .filter(([group,pair]) => cleanSearch(group).includes(search) || cleanSearch(pair[0]).includes(search))
-      .map(([group,pair]) => ({id,group,title:pair[0]}))) : [];
+    const sectionsFound = search ? topicIds.flatMap(id => [...new Set(byTopic[id].map(n => n.group))]
+      .filter(group => cleanSearch(group).includes(search))
+      .map(group => ({id,group,title:group}))) : [];
     const topicsFound = search ? Object.entries(TOPICS).filter(([id, t]) => cleanSearch(`${id} ${t.name}`).includes(search)) : [];
     let found;
     if (search) {
       found = notes.map(n => {
         const name = cleanSearch(n.title), tags = cleanSearch(`${n.topic} ${TOPICS[n.topic].name} ${n.group} ${n.title}`);
-        const headings = (BOOK_TERMS[n.title].lists || []).map(([heading]) => heading).join(" ");
-        const text = cleanSearch(`${n.application} ${n.formula || ""} ${headings}`);
+        const text = searchableText.get(n.key);
         const hits = words.every(w => tags.includes(w) || text.includes(w));
         const rank = name === search ? 0 : name.startsWith(search) ? 1 : name.includes(search) ? 2 : words.every(w => tags.includes(w)) ? 3 : 4;
         return { n, rank, hits };
@@ -478,88 +448,6 @@
     if (e.target.closest("a")) searchDialog.close();
   });
 
-  function scanOffset(printedPage) {
-    // The class scan repeats some printed pages. Its offsets were checked against the page footers.
-    if (bookFileSize !== 862189331 && sourceState !== "ready") return 0;
-    if (printedPage>=11 && printedPage<=88) return -1;
-    if (printedPage>=370 && printedPage<=477) return 1;
-    if (printedPage>=607 && printedPage<=725) return 2;
-    return 0;
-  }
-  function updateBookLink() {
-    const link=document.getElementById("book-open");
-    link.hidden=!(bookTarget && bookUrl);
-    if (link.hidden) { link.removeAttribute("href"); return; }
-    const printedPage=Number(bookPage.value) || bookTarget.first;
-    const automatic=scanOffset(printedPage);
-    pageOffset.placeholder=String(automatic);
-    const offset=pageOffset.value==="" ? automatic : Math.max(-50,Math.min(200,Math.trunc(Number(pageOffset.value)||0)));
-    const viewerPage=Math.max(1,printedPage+offset);
-    link.href=`${bookUrl}#page=${viewerPage}`;
-    link.textContent=`Open printed p. ${printedPage} ↗`;
-    document.getElementById("book-status").textContent=`Printed p. ${printedPage} opens at PDF viewer page ${viewerPage}.`;
-  }
-  function openBook(note, requestedPage, returnToTerm = false) {
-    activeBookNote = returnToTerm ? note : null;
-    bookTarget=refFor(note);
-    document.getElementById("book-reference").textContent=`${note.title} · ${bookTarget.label}`;
-    const pages=bookTarget.pages || [bookTarget.first];
-    const selected=pages.includes(requestedPage) ? requestedPage : bookTarget.first;
-    bookPage.innerHTML=pages.map(p=>`<option value="${p}" ${p===selected?"selected":""}>p. ${p}</option>`).join("");
-    bookPage.value=String(selected);
-    document.getElementById("book-parts").hidden=pages.length<2;
-    document.getElementById("book-title").textContent=sourceState==="ready" ? "Read in your textbook" : "Connect your textbook";
-    updateBookLink();
-    bookDialog.showModal();
-  }
-  document.getElementById("book-file").addEventListener("change", async e=>{
-    const file=e.target.files[0];
-    if (!file) return;
-    const request=++sourceRequest;
-    const editionStatus=document.getElementById("edition-status");
-    if (bookUrl) URL.revokeObjectURL(bookUrl);
-    bookUrl="";
-    bookFileSize=0;
-    sourceState="empty";
-    TextbookReader.clear();
-    document.getElementById("book-status").textContent="";
-    if (!(file.type==="application/pdf" || !file.type && /\.pdf$/i.test(file.name))) {
-      editionStatus.textContent="Choose a PDF copy of Paul Hoang’s fifth edition.";
-      updateBookLink();
-      render({refresh:true,keepPosition:true});
-      return;
-    }
-    bookUrl=URL.createObjectURL(file);
-    bookFileSize=file.size;
-    const previous=readLocal("bm-revision-offset-v2-"+bookFileSize,null);
-    pageOffset.value=previous===null ? "" : previous;
-    updateBookLink();
-    editionStatus.textContent="Checking the textbook edition…";
-    try {
-      const result=await TextbookReader.attach(file);
-      if (request!==sourceRequest) return;
-      sourceState=result.matched ? "ready" : "other";
-      editionStatus.textContent=result.matched ? "Connected. Textbook passages are available in every lesson and flashcard." : "This PDF has a different layout. Use the printed-page link below to read it, or choose the class copy for inline passages.";
-    } catch {
-      if (request!==sourceRequest) return;
-      sourceState="error";
-      editionStatus.textContent="The inline reader could not open this PDF. You can still open a printed page below or choose the file again.";
-    }
-    e.target.value="";
-    updateBookLink();
-    render({refresh:true,keepPosition:true});
-    if (sourceState==="ready" && bookDialog.open) {
-      bookDialog.close();
-      if (activeBookNote && route()[0]==="topic") scrollToLesson("term-"+activeBookNote.id);
-    }
-    document.getElementById("status").textContent=editionStatus.textContent;
-  });
-  pageOffset.addEventListener("input", ()=>{
-    if (bookUrl) writeLocal("bm-revision-offset-v2-"+bookFileSize,pageOffset.value===""?null:Number(pageOffset.value));
-    updateBookLink();
-  });
-  bookPage.addEventListener("change",updateBookLink);
-  document.getElementById("book-sources").addEventListener("click", () => bookDialog.close());
   document.querySelectorAll("dialog").forEach(dialog => dialog.addEventListener("click", e => {
     if (e.target !== dialog) return;
     const r = dialog.getBoundingClientRect();
@@ -603,10 +491,6 @@
         el.outerHTML = saveButton(byKey.get(key));
         holder.querySelector("[data-save]")?.focus({ preventScroll: true });
       }
-    } else if (el.dataset.book) {
-      openBook(byKey.get(el.dataset.book), Number(el.dataset.page), !!el.closest(".reading-term"));
-    } else if (el.dataset.close) {
-      document.getElementById(el.dataset.close).close();
     } else if (el.id === "draw-sample") {
       drawSample();
     }
@@ -617,7 +501,7 @@
       e.preventDefault(); openSearch();
     }
   });
-  window.addEventListener("hashchange", () => { if (searchDialog.open) searchDialog.close(); if (bookDialog.open) bookDialog.close(); render({ navigated: true }); });
+  window.addEventListener("hashchange", () => { if (searchDialog.open) searchDialog.close(); render({ navigated: true }); });
   render();
 })();
 
