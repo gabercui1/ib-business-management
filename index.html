@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0b0b">
+  <meta name="description" content="Read IB Business Management lessons for Units 1 and 4 by subtopic. Study worked examples and compare business decisions, then use separate SL and HL flashcards to practise recall.">
+  <title>Business Management | Revision Desk</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="course.js" defer></script>
+  <script src="notes.js" defer></script>
+  <script src="lessons.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main-content">Skip to content</a>
+  <header class="masthead">
+    <div class="shell head-inner">
+      <a class="brand" href="#/" aria-label="Revision Desk home">
+        <span class="brand-mark" aria-hidden="true">B<span>M</span></span>
+        <span class="brand-name">Revision Desk</span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="index-nav" id="nav-index" href="#/">Lessons</a>
+        <a class="index-nav" id="nav-flashcards" href="#/flashcards">Flashcards</a>
+        <button class="search-trigger" id="open-search" type="button" aria-label="Search lessons"><span class="magnifier" aria-hidden="true"></span><span>Search</span><kbd>/</kbd></button>
+      </nav>
+    </div>
+  </header>
+  <main id="main-content" class="shell" tabindex="-1"><noscript><h1>Business Management</h1><p>Enable JavaScript to read the lessons and practise with flashcards.</p></noscript></main>
+  <footer class="site-footer"><div class="shell footer-inner"><span>IBDP Business Management <span class="footer-dot">/</span> Paper 2 revision</span><a href="#/references">Textbook &amp; syllabus <span aria-hidden="true">↗</span></a></div></footer>
+  <dialog id="search-dialog" aria-labelledby="search-title">
+    <div class="search-head"><h2 id="search-title">Search the lessons</h2><button id="close-search" class="square" type="button" aria-label="Close search">×</button></div>
+    <div class="search-field"><span class="magnifier" aria-hidden="true"></span><input id="search-input" type="search" autocomplete="off" placeholder="Search topics or concepts…" aria-label="Search topics or concepts"></div>
+    <p id="search-status" role="status"></p><div id="search-results"></div>
+  </dialog>
+  <dialog id="book-dialog" aria-labelledby="book-title">
+    <div class="search-head"><h2 id="book-title">Read in your textbook</h2><button class="square" type="button" data-close="book-dialog" aria-label="Close textbook reference">×</button></div>
+    <div class="book-body">
+      <p class="kicker">Paul Hoang · Fifth edition</p><p id="book-reference" class="book-reference"></p>
+      <p>Choose your own PDF to open this reference. The file stays in this browser tab.</p>
+      <label class="field-label" for="book-file">Textbook PDF</label><input id="book-file" type="file" accept="application/pdf,.pdf">
+      <div id="book-parts" hidden><label class="field-label" for="book-page">Printed reference</label><select id="book-page"></select></div>
+      <details class="offset"><summary>Adjust PDF page numbering</summary><label for="page-offset">Viewer page minus printed page</label><input id="page-offset" type="number" min="-50" max="200" step="1" placeholder="0"><small>Leave blank for automatic numbering. If printed page 11 is viewer page 15 in another copy, enter 4.</small></details>
+      <p id="book-status" role="status"></p><a id="book-open" class="light-button" target="_blank" rel="noopener" hidden>Open textbook page ↗</a>
+      <a href="#/references" id="book-sources" class="source-link">Textbook and syllabus details <span aria-hidden="true">→</span></a>
+    </div>
+  </dialog>
+  <span class="visually-hidden" id="status" role="status"></span>
+</body>
+</html>
