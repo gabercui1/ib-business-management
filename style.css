@@ -453,7 +453,7 @@ dialog[open] { display: flex; flex-direction: column; }
 .source-request span { color:#bebebe; }
 .public-excerpt { margin-block:10px 14px; max-width:62ch; font:19px/1.5 var(--serif); color:#f1f1ef; }
 .public-excerpt cite { font:12px/1.5 var(--sans); color:#c1c1c1; }
-.textbook-content { min-width:0; margin:12px 0; padding:clamp(12px,2vw,21px); background:#fafaf8; color:#171815; border:1px solid #dededb; border-radius:4px; }
+.textbook-content { min-width:0; max-width:690px; margin:12px 0; padding:clamp(12px,2vw,21px); background:#fafaf8; color:#171815; border:1px solid #dededb; border-radius:4px; }
 .source-head { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; margin-bottom:8px; }
 .source-head > span { font-weight:650; color:#333630; }
 .source-ref { color:#555751; text-decoration:underline; text-underline-offset:2px; padding:0 1px; text-align:left; }
@@ -462,9 +462,9 @@ dialog[open] { display: flex; flex-direction: column; }
 .book-excerpt canvas { display:block; max-width:100%; }
 .source-list { margin-top:16px; padding-top:12px; border-top:1px solid #d9dad5; }
 .source-list h4 { margin:0 0 8px; font:650 15px/1.4 var(--sans); letter-spacing:-.012em; color:#1a1c19; }
-.source-list ul { list-style:disc outside; padding-inline-start:20px; margin:0; }
-.source-list li { display:list-item; min-width:0; padding:0 0 0 2px; margin:8px 0 12px; }
-.source-list li::marker { color:#3b3d36; }
+.source-list ul { list-style:none; padding-inline-start:20px; margin:0; }
+.source-list li { position:relative; display:list-item; min-width:0; padding:0 0 0 2px; margin:8px 0 12px; }
+.source-list li::before { content:""; position:absolute; inset-inline-start:-13px; top:9px; width:5px; height:5px; border-radius:50%; background:#3b3d36; }
 .source-list li .source-ref { display:inline-block; margin-top:2px; }
 .source-list li:last-child { margin-bottom:0; }
 .book-body .edition-status:empty { display:none; }

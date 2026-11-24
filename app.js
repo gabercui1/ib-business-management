@@ -214,7 +214,7 @@
       return `<div class="source-request">${sample}<div><button class="source-start" type="button" data-book="${escape(note.key)}">${icon("book",15)} ${action}</button><span>${escape(printed)}${count ? ` · ${count} ${count === 1 ? "point" : "points"}` : ""}</span></div></div>`;
     }
     const definition = `<div class="source-definition"><div class="source-head"><span>${escape(label)}</span>${sourcePageLink(note,entry.d)}</div>${excerpt(note,entry.d,label)}</div>`;
-    const evaluations = lists.map(([heading,items]) => `<section class="source-list" aria-label="${escape(heading)}"><h4>${escape(heading)}</h4><ul>${items.map((ids,i)=>`<li>${excerpt(note,ids,heading+" "+(i+1))}${sourcePageLink(note,ids)}</li>`).join("")}</ul></section>`).join("");
+    const evaluations = lists.map(([heading,items]) => `<section class="source-list" aria-label="${escape(heading)}"><h4>${escape(heading)}</h4><ul role="list">${items.map((ids,i)=>`<li>${excerpt(note,ids,heading+" "+(i+1))}${sourcePageLink(note,ids)}</li>`).join("")}</ul></section>`).join("");
     return `<div class="textbook-content">${definition}${evaluations}</div>`;
   }
   function bookBanner(note) {
